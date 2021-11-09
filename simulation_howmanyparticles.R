@@ -63,17 +63,17 @@ mean(errors)
 #Simulate all scenarios----
 
 subsample_size <- c(0.00001, 0.0001, 0.001, 0.01, 0.1, 1)
-count <- c(10, 100, 10^3, 10^4, 10^5, 10^6, 10^7, 10^8)
+count <- c(10, 100, 10^3, 10^4, 10^5, 10^6, 10^7, 10^8) #Probably decrease the size here. 
 
 test_df <- expand.grid(subsample_size, count) %>%
     filter(Var1 * Var2 >= 1) %>%
-    mutate(error = quantile(
-                        boot_mean_error_vector(
-                            sample_count = Var2, 
-                            sample_subsample_size = Var1),
-                    c(0.95)
-                    )
-    ) %>%
+    #mutate(error = quantile(
+    #                    boot_mean_error_vector(
+    #                        sample_count = Var2, 
+    #                        sample_subsample_size = Var1),
+    #                c(0.95)
+    #                )
+    #) %>%
     mutate(num_particles = Var1*Var2) %>%
     as_tibble()
 
