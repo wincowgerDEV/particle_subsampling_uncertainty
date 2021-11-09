@@ -1,13 +1,12 @@
+#Libraries ----
 library(dplyr)
 library(ggplot2)
 library(tidyr)
 library(mgcv)
+library(dtplyr)
+library(data.table)
 
-
-#give classes
-#randomly select some Pecent
-#compare that subsample to the full sample.
-#sum up all differences in absolute value space. 
+#template df ----
 data <- tibble(
     class_num = numeric(),
     subsample_size = numeric(),
@@ -15,6 +14,7 @@ data <- tibble(
     error = numeric()
 )
 
+#functions ----
 boot_mean_error <- function(sample_subsample_size, sample_count){
     #Disallow sample count to if(sample_count < sample_classes)
     #Disallow sample round(sample_subsample_size*sample_count, 0) < 1)
@@ -50,19 +50,32 @@ boot_mean_error <- function(sample_subsample_size, sample_count){
     error
 }
 
+boot_mean_error_vector <- Vectorize(boot_mean_error)
+
+
+#test single scenario----
 errors <- boot_mean_error(sample_count = 10, sample_subsample_size = 0.1) #Just say we will set this to 20, that is really what can be reliably characterized, can do a quick lit search to figure out how people are reporting it.    
 
 hist(errors)
 quantile(errors, c(0.025, 0.5, 0.975))
 mean(errors)
 
-#table(sample(particle_categories, size = sample_count, replace = T))
+#Simulate all scenarios----
 
-subsample_size <- c(seq(0.001, 0.01, by = 0.001), seq(0.01, 0.1, by = 0.01), seq(0.1, 0.9, by = 0.1))
-count <- c(seq(10, 100, by = 10), seq(100, 1000, by = 100), seq(1000, 10000, by = 1000), seq(10000, 100000, by = 10000))
+subsample_size <- c(0.00001, 0.0001, 0.001, 0.01, 0.1, 1)
+count <- c(10, 100, 10^3, 10^4, 10^5, 10^6, 10^7, 10^8)
 
 test_df <- expand.grid(subsample_size, count) %>%
-    filter(Var1 * Var2 >= 1)
+    filter(Var1 * Var2 >= 1) %>%
+    mutate(error = quantile(
+                        boot_mean_error_vector(
+                            sample_count = Var2, 
+                            sample_subsample_size = Var1),
+                    c(0.95)
+                    )
+    ) %>%
+    mutate(num_particles = Var1*Var2) %>%
+    as_tibble()
 
 for(n in 1:nrow(test_df)){
     test_df[n, "median_error"] <- quantile(
@@ -74,7 +87,7 @@ for(n in 1:nrow(test_df)){
 
 test_df <- test_df %>%
     #mutate(highly_accurate = median_error < 0.05, cut = cut(median_error, breaks = c(1, 0.1, 0.01, 0.001, 0.0001))) %>%
-    mutate(num_particles = Var1*Var2)
+    
 
 ggplot(test_df, aes(x = Var1, y = Var2)) + geom_tile(aes(fill = cut))+ scale_y_log10()+ scale_x_log10() + scale_fill_viridis_d() + labs(x = "Proportion of Subsample", y = "Sample Count") + theme_classic()
 ggplot(test_df, aes(x = Var1, y = median_error)) + geom_point(aes(color = Var2))+ scale_y_log10() + scale_x_log10() + geom_smooth(method = "lm")+ scale_fill_viridis_c()# + labs(x = "Proportion of Subsample", y = "Sample Count")
