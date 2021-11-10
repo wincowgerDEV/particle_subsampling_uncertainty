@@ -6,6 +6,8 @@ library(mgcv)
 library(dtplyr)
 library(data.table)
 
+#Options ----
+options(scipen = 999)
 #template df ----
 data <- tibble(
     class_num = numeric(),
@@ -13,6 +15,7 @@ data <- tibble(
     sample_count = numeric(),
     error = numeric()
 )
+
 
 #functions ----
 boot_mean_error <- function(sample_subsample_size, sample_count){
@@ -29,10 +32,13 @@ boot_mean_error <- function(sample_subsample_size, sample_count){
         sample_classes <- sample(2:10, 1)    #Sample classes must be greater than 1 but less than 20
         particle_categories <- 1:sample_classes
         
+        values <- rnorm(n = length(particle_categories))
+        weights <- values/sum(values)
+        
         #Simulation
         particles <- sample(particle_categories, size = sample_count, replace = T) #could add weights to this so that 1 or two of them always have a big sway. But we dont know that for sure yet.
         
-        subsetparticles <- sample(particles, round(sample_subsample_size*length(particles), 0))
+        subsetparticles <- sample(particles, size = sample_subsample_size)
         
         #Difference Metric
         error[n] <- as.data.frame(table(particles)/length(particles)) %>%
@@ -54,7 +60,7 @@ boot_mean_error_vector <- Vectorize(boot_mean_error)
 
 
 #test single scenario----
-errors <- boot_mean_error(sample_count = 10, sample_subsample_size = 0.1) #Just say we will set this to 20, that is really what can be reliably characterized, can do a quick lit search to figure out how people are reporting it.    
+errors <- boot_mean_error(sample_count = 10, sample_subsample_size = 1) #Just say we will set this to 20, that is really what can be reliably characterized, can do a quick lit search to figure out how people are reporting it.    
 
 hist(errors)
 quantile(errors, c(0.025, 0.5, 0.975))
@@ -62,8 +68,8 @@ mean(errors)
 
 #Simulate all scenarios----
 
-subsample_size <- c(0.00001, 0.0001, 0.001, 0.01, 0.1, 1)
-count <- c(10, 100, 10^3, 10^4, 10^5, 10^6, 10^7, 10^8) #Probably decrease the size here. 
+subsample_size <- c(0.000001, 0.00001, 0.0001, 0.001, 0.01, 0.1, 1)
+count <- c(10, 100, 10^3, 10^4, 10^5, 10^6) #Probably decrease the size here. 
 
 test_df <- expand.grid(subsample_size, count) %>%
     filter(Var1 * Var2 >= 1) %>%
@@ -75,57 +81,55 @@ test_df <- expand.grid(subsample_size, count) %>%
     #                )
     #) %>%
     mutate(num_particles = Var1*Var2) %>%
+        rename(sample_count = Var2 , subsample_proportion = Var1) %>%
     as_tibble()
 
 for(n in 1:nrow(test_df)){
     test_df[n, "median_error"] <- quantile(
-        boot_mean_error(sample_count = unlist(test_df[n,"Var2"]), 
-                        sample_subsample_size = unlist(test_df[n,"Var1"])),
+        boot_mean_error(sample_count = unlist(test_df[n,"sample_count"]), 
+                        sample_subsample_size = unlist(test_df[n,"num_particles"])),
         c(0.95)
     )
 }
 
-test_df <- test_df %>%
-    #mutate(highly_accurate = median_error < 0.05, cut = cut(median_error, breaks = c(1, 0.1, 0.01, 0.001, 0.0001))) %>%
-    
+cut <- cut(test_df$median_error, c( 0.0001, 0.001, 0.01, 0.1, 1))
+ggplot(test_df, aes(x = sample_count, y = num_particles)) +
+    geom_tile(aes(fill = log10(median_error)))+ 
+    geom_text(aes(label = round(median_error, 3)))+ 
+    scale_y_log10(breaks = c(1, 10, 100, 1000, 10000, 100000, 1000000), 
+                  labels = c(1, 10, 100, 1000, 10000, 100000, 1000000))+ 
+    scale_x_log10(breaks = c(1, 10, 100, 1000, 10000, 100000, 1000000), 
+                  labels = c(1, 10, 100, 1000, 10000, 100000, 1000000)) + 
+    scale_fill_viridis_c() + 
+    coord_equal(ratio = 1) + 
+    labs(x = "Sample Count", y = "Subsample Count") + 
+    theme_classic()
 
-ggplot(test_df, aes(x = Var1, y = Var2)) + geom_tile(aes(fill = cut))+ scale_y_log10()+ scale_x_log10() + scale_fill_viridis_d() + labs(x = "Proportion of Subsample", y = "Sample Count") + theme_classic()
-ggplot(test_df, aes(x = Var1, y = median_error)) + geom_point(aes(color = Var2))+ scale_y_log10() + scale_x_log10() + geom_smooth(method = "lm")+ scale_fill_viridis_c()# + labs(x = "Proportion of Subsample", y = "Sample Count")
-ggplot(test_df, aes(x = Var2, y = median_error)) + geom_point(aes(color = Var1))+ scale_y_log10()+ scale_x_log10()+ geom_smooth(method = "lm") + scale_fill_viridis_c()# + labs(x = "Proportion of Subsample", y = "Sample Count")
+#ggplot(test_df, aes(x = Var1, y = median_error)) + geom_point(aes(color = Var2))+ scale_y_log10() + scale_x_log10() + geom_smooth(method = "lm")+ scale_fill_viridis_c()# + labs(x = "Proportion of Subsample", y = "Sample Count")
+ggplot(test_df, aes(x = sample_count, y = median_error)) #+ geom_point(aes(color = Var1))+ scale_y_log10()+ scale_x_log10()+ geom_smooth(method = "lm") + scale_fill_viridis_c()# + labs(x = "Proportion of Subsample", y = "Sample Count")
 ggplot(test_df, aes(x = num_particles, y = median_error)) + 
     geom_hline(yintercept = 0.05) + 
-    geom_point(aes(color = Var1)) + 
-    scale_y_log10(breaks = c(0.0001, 0.001, 0.01, 0.1, 1), labels = c(0.0001, 0.001, 0.01, 0.1, 1), limits = c(0.0001, 1))+ 
-    scale_x_log10(breaks = c(1, 10, 100, 1000, 10000, 100000), labels = c(1, 10, 100, 1000, 10000, 100000)) + 
+    geom_point() + 
+    scale_y_log10()+ 
+    scale_x_log10() + 
+    geom_smooth(method = "lm") + 
     labs(x = "Number of Particles Subsampled", y = "Median Uncertainty (decimal proportion)") + 
     theme_classic(base_size = 20) + 
     guides(color=guide_legend(title="Proportion Subsampled"))
 
+model_df <- test_df %>%
+    filter(num_particles != sample_count)
+
+#Model development ----
 #Wow, almost an rsq of 1, I am sure there is some basic math I have missed and that is why I didn't just do that, but this is promising. Maybe we can bring in category and improve the model some more. 
-model <- lm(log(test_df$median_error) ~ log(test_df$Var2) + log(test_df$num_particles)) #could try ordernorm on this or something else. 
+model <- lm(log(model_df$num_particles)~  log(model_df$median_error)) #could try ordernorm on this or something else. 
 summary(model)             
 
-#Parameters
-count_mod = 10000
-#error_mod = 0.05
-subsample_mod = 0.01
+#Global plastic sampling. ----
+#How large should a sample be? 121 particles. If so, subsample all of them. 
+exp(model$coefficients[2] * log(0.05) + model$coefficients[1])
 
-#Var1 is subsample_size, Var2 is count, This seems to be corresponding well to the model
-10^(model$coefficients[2] * log10(subsample_mod) + model$coefficients[3] * log10(count_mod) + model$coefficients[1])
+#How many particles do we need to sample from the whole world?
+exp(model$coefficients[2] * log(10^-8) + model$coefficients[1])
 
-subsample_size_mod <- seq(0.001, 0.999, by = 0.001)
-count_mod <- 10:100000
-figure_mod_df <- expand.grid(subsample_size_mod, count_mod) %>%
-    mutate(error = 10^(model$coefficients[2] * log10(Var1) + model$coefficients[3] * log10(Var2) + model$coefficients[1]))
-ggplot(figure_mod_df, aes(x = Var1, y = Var2)) + geom_tile(aes(fill = error))+ scale_y_log10() + scale_fill_viridis_c() + labs(x = "Proportion of Subsample", y = "Sample Count")
 
-#e^((log(Uncertainty) - 0.100639 * log(proportion sampled) + 0.967713) /  -0.609322 )
-exp((log(0.05) - 0.10 * log(10^20) + 0.97) /  -0.61)
-
-#Flip this around to predict the count
-
-#I don't think I calculated this right. The result doesn't correspond to my expectations. 
-10^((log10(error_mod)-model$coefficients[1]) / (model$coefficients[3] * log10(count_mod) * model$coefficients[2]))*count_mod
-
-test_df$logerror <- log10(test_df$median_error)
-modelgam <- gam(logerror ~ s(log10(Var1)) + s(log10(Var2)), data = test_df)
