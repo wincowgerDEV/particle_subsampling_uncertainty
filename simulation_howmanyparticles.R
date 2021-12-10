@@ -21,7 +21,7 @@ data <- tibble(
 boot_mean_error <- function(sample_subsample_size, sample_count){
     #Disallow sample count to if(sample_count < sample_classes)
     #Disallow sample round(sample_subsample_size*sample_count, 0) < 1)
-    #, prob = c(0.5, 0.2, rep(0.3/8, 8)) if I add this to the first sample argument, we get a less conservative estimate, the errors go down. I think it is because you are less likely to mess up a skewed distribution than a uniform one. 
+    #prob = c(0.5, 0.2, rep(0.3/8, 8)) if I add this to the first sample argument, we get a less conservative estimate, the errors go down. I think it is because you are less likely to mess up a skewed distribution than a uniform one. 
     
     b = 100 #Changing b doesn't do much, probably more accurate with larger number but this will save time while in dev mode.
     error <- numeric(length = b)
@@ -32,11 +32,14 @@ boot_mean_error <- function(sample_subsample_size, sample_count){
         sample_classes <- sample(2:10, 1)    #Sample classes must be greater than 1 but less than 20
         particle_categories <- 1:sample_classes
         
-        values <- rnorm(n = length(particle_categories))
+        #Add gausian distribution to classes
+        #values <- rnorm(n = length(particle_categories), mean = 10, sd = 1)
+        #Or can swap for a poison distribution
+        values <- rpois(n = length(particle_categories), lambda = 1) + 1
         weights <- values/sum(values)
         
         #Simulation
-        particles <- sample(particle_categories, size = sample_count, replace = T) #could add weights to this so that 1 or two of them always have a big sway. But we dont know that for sure yet.
+        particles <- sample(particle_categories, size = sample_count, prob = weights, replace = T) #could add weights to this so that 1 or two of them always have a big sway. But we dont know that for sure yet.
         
         subsetparticles <- sample(particles, size = sample_subsample_size)
         
@@ -56,7 +59,7 @@ boot_mean_error <- function(sample_subsample_size, sample_count){
     error
 }
 
-boot_mean_error_vector <- Vectorize(boot_mean_error)
+#boot_mean_error_vector <- Vectorize(boot_mean_error)
 
 
 #test single scenario----
@@ -92,7 +95,7 @@ for(n in 1:nrow(test_df)){
     )
 }
 
-cut <- cut(test_df$median_error, c( 0.0001, 0.001, 0.01, 0.1, 1))
+#cut <- cut(test_df$median_error, c( 0.0001, 0.001, 0.01, 0.1, 1))
 ggplot(test_df, aes(x = sample_count, y = num_particles)) +
     geom_tile(aes(fill = log10(median_error)))+ 
     geom_text(aes(label = round(median_error, 3)))+ 
@@ -106,7 +109,7 @@ ggplot(test_df, aes(x = sample_count, y = num_particles)) +
     theme_classic()
 
 #ggplot(test_df, aes(x = Var1, y = median_error)) + geom_point(aes(color = Var2))+ scale_y_log10() + scale_x_log10() + geom_smooth(method = "lm")+ scale_fill_viridis_c()# + labs(x = "Proportion of Subsample", y = "Sample Count")
-ggplot(test_df, aes(x = sample_count, y = median_error)) #+ geom_point(aes(color = Var1))+ scale_y_log10()+ scale_x_log10()+ geom_smooth(method = "lm") + scale_fill_viridis_c()# + labs(x = "Proportion of Subsample", y = "Sample Count")
+#ggplot(test_df, aes(x = sample_count, y = median_error)) #+ geom_point(aes(color = Var1))+ scale_y_log10()+ scale_x_log10()+ geom_smooth(method = "lm") + scale_fill_viridis_c()# + labs(x = "Proportion of Subsample", y = "Sample Count")
 ggplot(test_df, aes(x = num_particles, y = median_error)) + 
     geom_hline(yintercept = 0.05) + 
     geom_point() + 
@@ -127,7 +130,7 @@ summary(model)
 
 #Global plastic sampling. ----
 #How large should a sample be? 121 particles. If so, subsample all of them. 
-exp(model$coefficients[2] * log(0.05) + model$coefficients[1])
+exp(model$coefficients[2] * log(0.01) + model$coefficients[1])
 
 #How many particles do we need to sample from the whole world?
 exp(model$coefficients[2] * log(10^-8) + model$coefficients[1])
