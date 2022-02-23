@@ -2,8 +2,6 @@
 library(dplyr)
 library(ggplot2)
 library(tidyr)
-library(mgcv)
-library(dtplyr)
 library(data.table)
 
 #Options ----
@@ -25,8 +23,6 @@ boot_mean_error <- function(sample_subsample_size, sample_count){
     
     b = 100 #Changing b doesn't do much, probably more accurate with larger number but this will save time while in dev mode.
     error <- numeric(length = b)
-    
-    set.seed(37)
     
     for(n in 1:b){
         sample_classes <- sample(2:10, 1)    #Sample classes must be greater than 1 but less than 20
@@ -87,13 +83,41 @@ test_df <- expand.grid(subsample_size, count) %>%
         rename(sample_count = Var2 , subsample_proportion = Var1) %>%
     as_tibble()
 
+#Just polymer types
 for(n in 1:nrow(test_df)){
+    set.seed(37)
     test_df[n, "median_error"] <- quantile(
         boot_mean_error(sample_count = unlist(test_df[n,"sample_count"]), 
                         sample_subsample_size = unlist(test_df[n,"num_particles"])),
         c(0.95)
     )
 }
+
+#Polymers, colors, morphologies
+for(n in 1:nrow(test_df)){
+    set.seed(37)
+    test_df[n, "median_error_multiple"] <- max(
+        c(
+        quantile(
+        boot_mean_error(sample_count = unlist(test_df[n,"sample_count"]), 
+                        sample_subsample_size = unlist(test_df[n,"num_particles"])),
+        c(0.95)
+    ), 
+    quantile(
+        boot_mean_error(sample_count = unlist(test_df[n,"sample_count"]), 
+                        sample_subsample_size = unlist(test_df[n,"num_particles"])),
+        c(0.95)
+    ), 
+    quantile(
+        boot_mean_error(sample_count = unlist(test_df[n,"sample_count"]), 
+                        sample_subsample_size = unlist(test_df[n,"num_particles"])),
+        c(0.95)
+        )
+        )
+    )
+}
+
+#plot of tiles ----
 
 #cut <- cut(test_df$median_error, c( 0.0001, 0.001, 0.01, 0.1, 1))
 ggplot(test_df, aes(x = sample_count, y = num_particles)) +
@@ -108,9 +132,34 @@ ggplot(test_df, aes(x = sample_count, y = num_particles)) +
     labs(x = "Sample Count", y = "Subsample Count") + 
     theme_classic()
 
+#cut <- cut(test_df$median_error, c( 0.0001, 0.001, 0.01, 0.1, 1))
+ggplot(test_df, aes(x = sample_count, y = num_particles)) +
+    geom_tile(aes(fill = log10(median_error_multiple)))+ 
+    geom_text(aes(label = round(median_error_multiple, 3)))+ 
+    scale_y_log10(breaks = c(1, 10, 100, 1000, 10000, 100000, 1000000), 
+                  labels = c(1, 10, 100, 1000, 10000, 100000, 1000000))+ 
+    scale_x_log10(breaks = c(1, 10, 100, 1000, 10000, 100000, 1000000), 
+                  labels = c(1, 10, 100, 1000, 10000, 100000, 1000000)) + 
+    scale_fill_viridis_c() + 
+    coord_equal(ratio = 1) + 
+    labs(x = "Sample Count", y = "Subsample Count") + 
+    theme_classic()
+
+#Plot of linear model ----
 #ggplot(test_df, aes(x = Var1, y = median_error)) + geom_point(aes(color = Var2))+ scale_y_log10() + scale_x_log10() + geom_smooth(method = "lm")+ scale_fill_viridis_c()# + labs(x = "Proportion of Subsample", y = "Sample Count")
 #ggplot(test_df, aes(x = sample_count, y = median_error)) #+ geom_point(aes(color = Var1))+ scale_y_log10()+ scale_x_log10()+ geom_smooth(method = "lm") + scale_fill_viridis_c()# + labs(x = "Proportion of Subsample", y = "Sample Count")
 ggplot(test_df, aes(x = num_particles, y = median_error)) + 
+    geom_hline(yintercept = 0.05) + 
+    geom_point() + 
+    scale_y_log10()+ 
+    scale_x_log10() + 
+    geom_smooth(method = "lm") + 
+    labs(x = "Number of Particles Subsampled", y = "Median Uncertainty (decimal proportion)") + 
+    theme_classic(base_size = 20) + 
+    guides(color=guide_legend(title="Proportion Subsampled"))
+
+
+ggplot(test_df, aes(x = num_particles, y = median_error_multiple)) + 
     geom_hline(yintercept = 0.05) + 
     geom_point() + 
     scale_y_log10()+ 
@@ -125,14 +174,19 @@ model_df <- test_df %>%
 
 #Model development ----
 #Wow, almost an rsq of 1, I am sure there is some basic math I have missed and that is why I didn't just do that, but this is promising. Maybe we can bring in category and improve the model some more. 
-model <- lm(log(model_df$num_particles)~  log(model_df$median_error)) #could try ordernorm on this or something else. 
-summary(model)             
+model_single <- lm(log(model_df$num_particles)~  log(model_df$median_error)) #could try ordernorm on this or something else. 
+summary(model_single)             
+
+model_multiple <- lm(log(model_df$num_particles)~  log(model_df$median_error_multiple)) #could try ordernorm on this or something else. 
+summary(model_multiple)  
 
 #Global plastic sampling. ----
 #How large should a sample be? 121 particles. If so, subsample all of them. 
-exp(model$coefficients[2] * log(0.01) + model$coefficients[1])
+exp(model_single$coefficients[2] * log(0.05) + model_single$coefficients[1])
+exp(model_multiple$coefficients[2] * log(0.05) + model_multiple$coefficients[1])
 
 #How many particles do we need to sample from the whole world?
+exp(model_multiple$coefficients[2] * log(0.01) + model_multiple$coefficients[1])
 exp(model$coefficients[2] * log(10^-8) + model$coefficients[1])
 
 
