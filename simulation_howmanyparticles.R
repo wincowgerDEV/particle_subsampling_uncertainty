@@ -47,7 +47,7 @@ boot_mean_error_class_num <- function(sample_subsample_size, sample_count, class
             dplyr::rename(subsetparticles = particles) %>%
             left_join(as.data.frame(table(subsetparticles)/length(subsetparticles)) %>%
                           dplyr::rename(Freq2 = Freq)) %>%
-            dplyr::mutate(difference = (Freq - Freq2)/Freq * 100) %>%
+            dplyr::mutate(difference = (Freq2 - Freq)/Freq * 100) %>%
             dplyr::mutate(difference = ifelse(is.na(difference), 100, difference)) %>% #This sets any classes which weren't accounted for from the original group to be completely unaccounted for. 
             pull(difference) %>%
             abs() %>%
@@ -275,7 +275,7 @@ ggplot(test_df) +
     geom_smooth(aes(x = num_particles, y = median_error_32class), method = "lm", se = F, color = "pink") + 
     # geom_smooth(method = "lm", se = F) + 
     #coord_equal() + 
-    labs(x = "Number of Particles Subsampled", y = "High Absolute Error (decimal proportion)") + 
+    labs(x = "Number of Particles Subsampled", y = "High Relative Error (decimal proportion)") + 
     theme_classic(base_size = 20) + 
     guides(color=guide_legend(title="Proportion Subsampled"))
 
