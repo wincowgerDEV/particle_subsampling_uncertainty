@@ -34,11 +34,11 @@ boot_mean_error_class_num <- function(sample_subsample_size, sample_count, class
         #Add gausian distribution to classes
         #values <- rnorm(n = length(particle_categories), mean = 10, sd = 1)
         #Or can swap for a poison distribution
-        #values <- rpois(n = length(particle_categories), lambda = 1) + 1
-        #weights <- values/sum(values)
+        values <- rpois(n = length(particle_categories), lambda = 1) + 1
+        weights <- values/sum(values)
         
         #Simulation
-        particles <- sample(particle_categories, size = sample_count, replace = T) #could add weights to this so that 1 or two of them always have a big sway. But we dont know that for sure yet.
+        particles <- sample(particle_categories, size = sample_count, prob = weights, replace = T) #could add weights to this so that 1 or two of them always have a big sway. But we dont know that for sure yet.
         
         subsetparticles <- sample(particles, size = sample_subsample_size)
         
@@ -47,8 +47,8 @@ boot_mean_error_class_num <- function(sample_subsample_size, sample_count, class
             dplyr::rename(subsetparticles = particles) %>%
             left_join(as.data.frame(table(subsetparticles)/length(subsetparticles)) %>%
                           dplyr::rename(Freq2 = Freq)) %>%
-            dplyr::mutate(difference = Freq - Freq2) %>%
-            dplyr::mutate(difference = ifelse(is.na(difference), Freq, difference)) %>% #This sets any classes which weren't accounted for from the original group to be completely unaccounted for. 
+            dplyr::mutate(difference = (Freq - Freq2)/Freq * 100) %>%
+            dplyr::mutate(difference = ifelse(is.na(difference), 100, difference)) %>% #This sets any classes which weren't accounted for from the original group to be completely unaccounted for. 
             pull(difference) %>%
             abs() %>%
             quantile(., c(0.95)) #this is the MAE or mean absolute error. Could also do mean here, might be a useful metric. Or RMSE or some other more commonly used metric.
