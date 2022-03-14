@@ -34,11 +34,11 @@ boot_mean_error_class_num <- function(sample_subsample_size, sample_count, class
         #Add gausian distribution to classes
         #values <- rnorm(n = length(particle_categories), mean = 10, sd = 1)
         #Or can swap for a poison distribution
-        values <- rpois(n = length(particle_categories), lambda = 1) + 1
-        weights <- values/sum(values)
+        #values <- rpois(n = length(particle_categories), lambda = 1) + 1
+        #weights <- values/sum(values)
         
         #Simulation
-        particles <- sample(particle_categories, size = sample_count, prob = weights, replace = T) #could add weights to this so that 1 or two of them always have a big sway. But we dont know that for sure yet.
+        particles <- sample(particle_categories, size = sample_count, replace = T) #could add weights to this so that 1 or two of them always have a big sway. But we dont know that for sure yet.
         
         subsetparticles <- sample(particles, size = sample_subsample_size)
         
