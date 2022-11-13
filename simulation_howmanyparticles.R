@@ -47,8 +47,8 @@ boot_mean_error_class_num <- function(sample_subsample_size, sample_count, class
             dplyr::rename(subsetparticles = particles) %>%
             left_join(as.data.frame(table(subsetparticles)/length(subsetparticles)) %>%
                           dplyr::rename(Freq2 = Freq)) %>%
-            dplyr::mutate(difference = (Freq2 - Freq)/Freq * 100) %>%
-            dplyr::mutate(difference = ifelse(is.na(difference), 100, difference)) %>% #This sets any classes which weren't accounted for from the original group to be completely unaccounted for. 
+          dplyr::mutate(difference = Freq - Freq2) %>%
+          dplyr::mutate(difference = ifelse(is.na(difference), Freq, difference)) %>% #This sets any classes which weren't accounted for from the original group to be completely unaccounted for. 
             pull(difference) %>%
             abs() %>%
             quantile(., c(0.95)) #this is the MAE or mean absolute error. Could also do mean here, might be a useful metric. Or RMSE or some other more commonly used metric.
@@ -260,7 +260,7 @@ ggplot(test_df, aes(x = num_particles, y = median_error)) +
     guides(color=guide_legend(title="Proportion Subsampled"))
 
 ggplot(test_df) + 
-    geom_hline(yintercept = 0.05) + 
+    geom_hline(yintercept = 5) + 
     geom_point(aes(x = num_particles, y = median_error_2class), color = "blue") + 
     geom_point(aes(x = num_particles, y = median_error_4class), color = "red") + 
     geom_point(aes(x = num_particles, y = median_error_8class), color = "black") + 
@@ -275,7 +275,7 @@ ggplot(test_df) +
     geom_smooth(aes(x = num_particles, y = median_error_32class), method = "lm", se = F, color = "pink") + 
     # geom_smooth(method = "lm", se = F) + 
     #coord_equal() + 
-    labs(x = "Number of Particles Subsampled", y = "High Relative Error (decimal proportion)") + 
+    labs(x = "Number of Particles Subsampled", y = "High Relative Error (%)") + 
     theme_classic(base_size = 20) + 
     guides(color=guide_legend(title="Proportion Subsampled"))
 
