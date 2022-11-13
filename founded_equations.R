@@ -72,6 +72,7 @@ ggplot(simulation_validation) +
 
 #final recommendations for sample size and subsample size.
 uncorrected_eq()
+uncorrected_eq(max_error = 0.1)
 
 #final recommendation for all group analysis at once.
 uncorrected_eq(groups = 4)
