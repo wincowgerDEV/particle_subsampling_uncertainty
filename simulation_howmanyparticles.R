@@ -5,7 +5,13 @@ library(tidyr)
 library(data.table)
 
 #Options ----
-options(scipen = 999)
+options(scipen = 99)
+population_sizes <- 10^(1:10)
+groups <- 1:5
+max_error <- c(10^(c(-5:-1)), 0.05)
+subsample_size <- c(0.000001, 0.00001, 0.0001, 0.001, 0.01, 0.1, 1)
+count <- c(10, 100, 10^3, 10^4, 10^5, 10^6) #Probably decrease the size here. 
+
 #template df ----
 data <- tibble(
     class_num = numeric(),
@@ -14,10 +20,16 @@ data <- tibble(
     error = numeric()
 )
 
-sample_subsample_size = 100
-sample_count = 1000
-
 #functions ----
+
+finite_corrected_eq <- function(pop_size, uncorrected){
+  round(pop_size * uncorrected / (uncorrected + pop_size - 1), 0)
+} 
+
+uncorrected_eq <- function(confidence = 0.95, groups = 1, expected_p = 0.5, max_error = 0.05){
+  critical_val = qnorm(p=(1-confidence^(1/groups))/2) # The group root is a new thing here. 
+  round(critical_val^2*expected_p*(1-expected_p)/max_error^2, 0)
+}
 
 boot_mean_error_class_num <- function(sample_subsample_size, sample_count, classes){
     #Disallow sample count to if(sample_count < sample_classes)
@@ -108,19 +120,8 @@ quantile(errors, c(0.025, 0.5, 0.975))
 mean(errors)
 
 #Simulate all scenarios----
-
-subsample_size <- c(0.000001, 0.00001, 0.0001, 0.001, 0.01, 0.1, 1)
-count <- c(10, 100, 10^3, 10^4, 10^5, 10^6) #Probably decrease the size here. 
-
 test_df <- expand.grid(subsample_size, count) %>%
-    filter(Var1 * Var2 >= 32) %>% #change to 1 for earlier figures. 
-    #mutate(error = quantile(
-    #                    boot_mean_error_vector(
-    #                        sample_count = Var2, 
-    #                        sample_subsample_size = Var1),
-    #                c(0.95)
-    #                )
-    #) %>%
+    filter(Var1 * Var2 >= 1) %>% 
     mutate(num_particles = Var1*Var2) %>%
         rename(sample_count = Var2 , subsample_proportion = Var1) %>%
     as_tibble()
@@ -131,57 +132,6 @@ for(n in 1:nrow(test_df)){
     test_df[n, "median_error"] <- quantile(
         boot_mean_error(sample_count = unlist(test_df[n,"sample_count"]), 
                         sample_subsample_size = unlist(test_df[n,"num_particles"])),
-        c(0.95)
-    )
-}
-
-#Just polymer types with class
-for(n in 1:nrow(test_df)){
-    set.seed(37)
-    test_df[n, "median_error_2class"] <- quantile(
-        boot_mean_error_class_num(sample_count = unlist(test_df[n,"sample_count"]), 
-                        sample_subsample_size = unlist(test_df[n,"num_particles"]), 
-                        classes = 2),
-        c(0.95)
-    )
-}
-
-for(n in 1:nrow(test_df)){
-    set.seed(37)
-    test_df[n, "median_error_4class"] <- quantile(
-        boot_mean_error_class_num(sample_count = unlist(test_df[n,"sample_count"]), 
-                                  sample_subsample_size = unlist(test_df[n,"num_particles"]), 
-                                  classes = 4),
-        c(0.95)
-    )
-}
-
-for(n in 1:nrow(test_df)){
-    set.seed(37)
-    test_df[n, "median_error_8class"] <- quantile(
-        boot_mean_error_class_num(sample_count = unlist(test_df[n,"sample_count"]), 
-                                  sample_subsample_size = unlist(test_df[n,"num_particles"]), 
-                                  classes = 8),
-        c(0.95)
-    )
-}
-
-for(n in 1:nrow(test_df)){
-    set.seed(37)
-    test_df[n, "median_error_16class"] <- quantile(
-        boot_mean_error_class_num(sample_count = unlist(test_df[n,"sample_count"]), 
-                                  sample_subsample_size = unlist(test_df[n,"num_particles"]), 
-                                  classes = 16),
-        c(0.95)
-    )
-}
-
-for(n in 1:nrow(test_df)){
-    set.seed(37)
-    test_df[n, "median_error_32class"] <- quantile(
-        boot_mean_error_class_num(sample_count = unlist(test_df[n,"sample_count"]), 
-                                  sample_subsample_size = unlist(test_df[n,"num_particles"]), 
-                                  classes = 32),
         c(0.95)
     )
 }
@@ -217,100 +167,79 @@ for(n in 1:nrow(test_df)){
     )
 }
 
-#plot of tiles ----
+# Equations ----
 
-#cut <- cut(test_df$median_error, c( 0.0001, 0.001, 0.01, 0.1, 1))
-ggplot(test_df, aes(x = sample_count, y = num_particles)) +
-    geom_tile(aes(fill = log10(median_error)))+ 
-    geom_text(aes(label = round(median_error, 3)))+ 
-    scale_y_log10(breaks = c(1, 10, 100, 1000, 10000, 100000, 1000000), 
-                  labels = c(1, 10, 100, 1000, 10000, 100000, 1000000))+ 
-    scale_x_log10(breaks = c(1, 10, 100, 1000, 10000, 100000, 1000000), 
-                  labels = c(1, 10, 100, 1000, 10000, 100000, 1000000)) + 
-    scale_fill_viridis_c() + 
-    coord_equal(ratio = 1) + 
-    labs(x = "Sample Count", y = "Subsample Count") + 
-    theme_classic(base_size = 20)
+test_ungrouped <- expand.grid(population_sizes = population_sizes, max_error = max_error) %>%
+  mutate(sample_size = finite_corrected_eq(pop_size = population_sizes, uncorrected = uncorrected_eq(max_error = max_error)))
 
-#cut <- cut(test_df$median_error, c( 0.0001, 0.001, 0.01, 0.1, 1))
-ggplot(test_df, aes(x = sample_count, y = num_particles)) +
-    geom_tile(aes(fill = log10(median_error_multiple)))+ 
-    geom_text(aes(label = round(median_error_multiple, 3)))+ 
-    scale_y_log10(breaks = c(1, 10, 100, 1000, 10000, 100000, 1000000), 
-                  labels = c(1, 10, 100, 1000, 10000, 100000, 1000000))+ 
-    scale_x_log10(breaks = c(1, 10, 100, 1000, 10000, 100000, 1000000), 
-                  labels = c(1, 10, 100, 1000, 10000, 100000, 1000000)) + 
-    scale_fill_viridis_c() + 
-    coord_equal(ratio = 1) + 
-    labs(x = "Sample Count", y = "Subsample Count") + 
-    theme_classic()
-
-#Plot of linear model ----
-#ggplot(test_df, aes(x = Var1, y = median_error)) + geom_point(aes(color = Var2))+ scale_y_log10() + scale_x_log10() + geom_smooth(method = "lm")+ scale_fill_viridis_c()# + labs(x = "Proportion of Subsample", y = "Sample Count")
-#ggplot(test_df, aes(x = sample_count, y = median_error)) #+ geom_point(aes(color = Var1))+ scale_y_log10()+ scale_x_log10()+ geom_smooth(method = "lm") + scale_fill_viridis_c()# + labs(x = "Proportion of Subsample", y = "Sample Count")
-ggplot(test_df, aes(x = num_particles, y = median_error)) + 
-    geom_hline(yintercept = 0.05) + 
-    geom_point() + 
-    scale_y_log10()+ 
-    scale_x_log10() + 
-    geom_smooth(method = "lm", se = F) + 
-    #coord_equal() + 
-    labs(x = "Number of Particles Subsampled", y = "High Absolute Error (decimal proportion)") + 
-    theme_classic(base_size = 20) + 
-    guides(color=guide_legend(title="Proportion Subsampled"))
-
-ggplot(test_df) + 
-    geom_hline(yintercept = 5) + 
-    geom_point(aes(x = num_particles, y = median_error_2class), color = "blue") + 
-    geom_point(aes(x = num_particles, y = median_error_4class), color = "red") + 
-    geom_point(aes(x = num_particles, y = median_error_8class), color = "black") + 
-    geom_point(aes(x = num_particles, y = median_error_16class), color = "green") + 
-    geom_point(aes(x = num_particles, y = median_error_32class), color = "pink") + 
-    scale_y_log10()+ 
-    scale_x_log10() + 
-    geom_smooth(aes(x = num_particles, y = median_error_2class), method = "lm", se = F, color = "blue") + 
-    geom_smooth(aes(x = num_particles, y = median_error_4class), method = "lm", se = F, color = "red") + 
-    geom_smooth(aes(x = num_particles, y = median_error_8class), method = "lm", se = F, color = "black") + 
-    geom_smooth(aes(x = num_particles, y = median_error_16class), method = "lm", se = F, color = "green") + 
-    geom_smooth(aes(x = num_particles, y = median_error_32class), method = "lm", se = F, color = "pink") + 
-    # geom_smooth(method = "lm", se = F) + 
-    #coord_equal() + 
-    labs(x = "Number of Particles Subsampled", y = "High Relative Error (%)") + 
-    theme_classic(base_size = 20) + 
-    guides(color=guide_legend(title="Proportion Subsampled"))
+test_grouped <- expand.grid(population_sizes = population_sizes, max_error = max_error) %>%
+  mutate(sample_size = finite_corrected_eq(pop_size = population_sizes, uncorrected = uncorrected_eq(max_error = max_error, groups = 4)))
 
 
-ggplot(test_df, aes(x = num_particles, y = median_error_multiple)) + 
-    geom_hline(yintercept = 0.05) + 
-    geom_point() + 
-    scale_y_log10()+ 
-    scale_x_log10() + 
-    geom_smooth(method = "lm") + 
-    labs(x = "Number of Particles Subsampled", y = "Median Uncertainty (decimal proportion)") + 
-    theme_classic(base_size = 20) + 
-    guides(color=guide_legend(title="Proportion Subsampled"))
+#Plots ----
+ggplot() +
+  geom_point(data = test_ungrouped %>% arrange(desc(max_error)), aes(x = population_sizes, y = sample_size, color = factor(max_error, levels = c(10^(c(-5:-1)), 0.05))), size = 10) +
+  geom_point(data = test_grouped %>% arrange(desc(max_error)), aes(x = population_sizes, y = sample_size, color = factor(max_error, levels = c(10^(c(-5:-1)), 0.05))), size = 10, shape = 2) +
+  scale_x_log10(breaks = unique(population_sizes)) +
+  scale_y_log10(breaks = unique(population_sizes)) + 
+  scale_color_viridis_d() +
+  theme_dark(base_size = 10) +
+  labs(color = "Error", x = "Sample Size", y = "Subsample Size") +
+  coord_equal()
 
-model_df <- test_df %>%
-    filter(num_particles != sample_count)
+test_nopop_nogroup <- expand.grid(population_sizes = population_sizes, max_error = max_error) %>%
+  mutate(sample_size = uncorrected_eq(max_error = max_error))
 
-#Model development ----
-#Wow, almost an rsq of 1, I am sure there is some basic math I have missed and that is why I didn't just do that, but this is promising. Maybe we can bring in category and improve the model some more. 
-model_single <- lm(log(model_df$num_particles)~  log(model_df$median_error)) #could try ordernorm on this or something else. 
-summary(model_single)             
+test_nopop <- expand.grid(population_sizes = population_sizes, max_error = max_error) %>%
+  mutate(sample_size = uncorrected_eq(max_error = max_error, groups = 4))
 
-model_multiple <- lm(log(model_df$num_particles)~  log(model_df$median_error_multiple)) #could try ordernorm on this or something else. 
-summary(model_multiple)  
+ggplot() +
+  geom_line(data = test_nopop %>% arrange(desc(max_error)), aes(x = max_error, y = sample_size), size = 2) +
+  geom_line(data = test_nopop_nogroup %>% arrange(desc(max_error)), aes(x = max_error, y = sample_size), size = 2, color = "yellow") +
+  scale_x_log10(breaks = unique(max_error)) +
+  scale_y_log10(breaks = unique(population_sizes)) + 
+  theme_dark(base_size = 20) +
+  labs(x = "Error", y = "Sample Size") +
+  coord_equal()
 
-#Global plastic sampling. ----
-#How large should a sample be? 121 particles. If so, subsample all of them. 
-exp(model_single$coefficients[2] * log(0.05) + model_single$coefficients[1])
-exp(model_multiple$coefficients[2] * log(0.05) + model_multiple$coefficients[1])
 
-#How many particles do we need to sample from the whole world?
-exp(model_multiple$coefficients[2] * log(0.01) + model_multiple$coefficients[1])
-exp(model$coefficients[2] * log(10^-8) + model$coefficients[1])
+simulation_validation <- test_df %>%
+  mutate(mathematic_sub_count = finite_corrected_eq(pop_size = sample_count, uncorrected = uncorrected_eq(max_error = median_error))) %>%
+  mutate(mathematic_sub_count_grouped = finite_corrected_eq(pop_size = sample_count, uncorrected = uncorrected_eq(max_error = median_error_multiple, groups = 4)))
 
-#exact equations
-exp(-2*log(0.05)-0.4)
-exp(-2.1*log(0.01)-0.3)
+ggplot(simulation_validation) +
+  geom_point(aes(x = num_particles, y = mathematic_sub_count), size = 4, alpha = 0.5) + 
+  geom_point(aes(x = num_particles, y = mathematic_sub_count_grouped), size = 4, alpha = 0.5, color = "red") + 
+  scale_x_log10(limits = c(10,150000)) + 
+  scale_y_log10(limits = c(10,150000)) +
+  geom_abline(slope=1, intercept = 0) +
+  theme_dark(base_size = 20) +
+  coord_equal() +
+  labs(x = "Simulated Sample Counts", y = "Calculated Sample Counts")
+
+#final recommendations for sample size and subsample size. ----
+uncorrected_eq()
+uncorrected_eq(max_error = 0.1)
+
+#final recommendation for all group analysis at once.
+uncorrected_eq(groups = 4)
+
+#Number of papers to review 
+finite_corrected_eq(pop_size = 1000, uncorrected = uncorrected_eq())
+
+0.95^(1/3)
+
+#Checking correspondence with simulations. 
+finite_corrected_eq(pop_size = 100, uncorrected = uncorrected_eq(max_error = 0.3))
+finite_corrected_eq(pop_size = 1000, uncorrected = uncorrected_eq(max_error = 0.1))
+finite_corrected_eq(pop_size = 10000, uncorrected = uncorrected_eq(max_error = 0.03))
+finite_corrected_eq(pop_size = 100000, uncorrected = uncorrected_eq(max_error = 0.01))
+finite_corrected_eq(pop_size = 1000000, uncorrected = uncorrected_eq(max_error = 0.003))
+
+#Checking correspondence with simulations. 
+finite_corrected_eq(pop_size = 100, uncorrected = uncorrected_eq(max_error = 0.3, groups = 50))
+finite_corrected_eq(pop_size = 1000, uncorrected = uncorrected_eq(max_error = 0.1, groups = 50))
+finite_corrected_eq(pop_size = 10000, uncorrected = uncorrected_eq(max_error = 0.03, groups = 50))
+finite_corrected_eq(pop_size = 100000, uncorrected = uncorrected_eq(max_error = 0.01, groups = 50))
+finite_corrected_eq(pop_size = 1000000, uncorrected = uncorrected_eq(max_error = 0.003, groups = 50))
 
