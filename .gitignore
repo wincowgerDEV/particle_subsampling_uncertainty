@@ -3,5 +3,6 @@
 .RData
 .Ruserdata
 Manuscript/
-**.ini
+.ini
+*desktop.ini
 desktop.ini
