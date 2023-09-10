@@ -27,8 +27,8 @@
      inkscape:document-units="pt"
      showgrid="false"
      inkscape:zoom="0.87606451"
-     inkscape:cx="215.1668"
-     inkscape:cy="424.05553"
+     inkscape:cx="45.088004"
+     inkscape:cy="425.197"
      inkscape:window-width="2400"
      inkscape:window-height="1261"
      inkscape:window-x="-9"
@@ -996,4 +996,40 @@
        style="font-size:21px;stroke-width:0.75">10<tspan
    style="font-size:21px;baseline-shift:super"
    id="tspan4687-5-4-5">-1</tspan></tspan></text>
+  <text
+     xml:space="preserve"
+     style="font-size:27px;line-height:1.25;font-family:sans-serif;text-align:center;text-anchor:middle;stroke-width:0.75"
+     x="376.73633"
+     y="-201.36836"
+     id="text526"
+     transform="rotate(62)"><tspan
+       sodipodi:role="line"
+       id="tspan524"
+       x="376.73633"
+       y="-201.36836"
+       style="font-size:27px;stroke-width:0.75">Single Group</tspan></text>
+  <text
+     xml:space="preserve"
+     style="font-size:27px;line-height:1.25;font-family:sans-serif;text-align:center;text-anchor:middle;stroke-width:0.75"
+     x="371.43518"
+     y="-239.25836"
+     id="text526-2"
+     transform="rotate(62)"><tspan
+       sodipodi:role="line"
+       id="tspan524-7"
+       x="371.43518"
+       y="-239.25836"
+       style="font-size:27px;stroke-width:0.75">Four Groups</tspan></text>
+  <text
+     xml:space="preserve"
+     style="font-size:27px;line-height:1.25;font-family:sans-serif;text-align:center;text-anchor:middle;stroke-width:0.75"
+     x="-151.98047"
+     y="491.46094"
+     id="text526-2-8"
+     transform="rotate(-90)"><tspan
+       sodipodi:role="line"
+       id="tspan524-7-3"
+       x="-151.98047"
+       y="491.46094"
+       style="font-size:27px;stroke-width:0.75">Suggested Threshold</tspan></text>
 </svg>
