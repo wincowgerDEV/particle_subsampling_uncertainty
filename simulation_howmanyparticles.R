@@ -109,8 +109,6 @@ boot_mean_error <- function(sample_subsample_size, sample_count){
     error
 }
 
-#boot_mean_error_vector <- Vectorize(boot_mean_error)
-
 
 #test single scenario----
 errors <- boot_mean_error(sample_count = 10, sample_subsample_size = 1) #Just say we will set this to 20, that is really what can be reliably characterized, can do a quick lit search to figure out how people are reporting it.    
