@@ -70,6 +70,17 @@ boot_mean_error_class_num <- function(sample_subsample_size, sample_count, class
     error
 }
 
+boot_mean <- function(x, b = 100){
+  
+  value <- numeric(length = b)
+  
+  for(n in 1:b){
+    value[n] <- mean(sample(x, b, replace = T), na.rm = T)
+  }
+  
+  value
+}
+
 boot_mean_error <- function(sample_subsample_size, sample_count){
     #Disallow sample count to if(sample_count < sample_classes)
     #Disallow sample round(sample_subsample_size*sample_count, 0) < 1)
@@ -164,6 +175,89 @@ for(n in 1:nrow(test_df)){
     c(0.95)
     )
 }
+
+# Real Data Example ----
+
+lake_data <- fread("datasets_SubsamplingDatasets/2_MPs_features.csv")
+
+env_data_test <- function(lake_data, subsample_size) {
+ 
+  full_results_shape <- lake_data |>
+    group_by(sample_lake, shape) |>
+    summarise(count = n()) |>
+    ungroup() |>
+    group_by(sample_lake) |>
+    mutate(proportion = count/sum(count)) |>
+    ungroup()
+  
+  full_results_color <- lake_data |>
+    group_by(sample_lake, color) |>
+    summarise(count = n()) |>
+    ungroup() |>
+    group_by(sample_lake) |>
+    mutate(proportion = count/sum(count)) |>
+    ungroup()
+  
+  results_subsampled <-  lake_data |>
+    group_by(sample_lake) |>
+    mutate(sample_particles = n()) |>
+    filter(sample_particles > subsample_size) |>
+    sample_n(size = subsample_size, replace = F) 
+  
+  results_subsampled_shape <-  results_subsampled |>
+    group_by(sample_lake, shape) |>
+    summarise(count = n()) |>
+    ungroup() |>
+    group_by(sample_lake) |>
+    mutate(proportion = count/sum(count)) |>
+    ungroup() |>
+    left_join(full_results_shape, by = c("sample_lake", "shape")) |>
+    mutate(error = abs(proportion.y - proportion.x)) |> 
+    group_by(sample_lake) |>
+    summarise(max_error = quantile(error, 0.95),
+              sample_size = sum(count.y), 
+              subsample_size = subsample_size, 
+              max_prop = max(proportion.y)
+    ) |>
+    ungroup() 
+  
+  results_subsampled_color <-  results_subsampled |>
+    group_by(sample_lake, color) |>
+    summarise(count = n()) |>
+    ungroup() |>
+    group_by(sample_lake) |>
+    mutate(proportion = count/sum(count)) |>
+    ungroup() |>
+    left_join(full_results_color, by = c("sample_lake", "color")) |>
+    mutate(error = abs(proportion.y - proportion.x)) |> 
+    group_by(sample_lake) |>
+    summarise(max_error = quantile(error, 0.95),
+              sample_size = sum(count.y), 
+              subsample_size = subsample_size, 
+              max_prop = max(proportion.y)
+    ) |>
+    ungroup() 
+  
+  joined_results <- bind_rows(results_subsampled_shape, results_subsampled_color) |>
+    group_by(sample_lake) |>
+    filter(max_error == max(max_error)) |>
+    mutate(mathematic_sub_count = finite_corrected_eq(pop_size = sample_size, uncorrected = uncorrected_eq(max_error = max_error, 
+                                                                                                           #expected_p = max_prop, 
+                                                                                                           groups = 2)))
+
+
+ bootsy <- boot_mean(joined_results$mathematic_sub_count) |>
+   quantile(probs = c(0.025, 0.975)) 
+ 
+ data.table(subsample_size = subsample_size, 
+            mean = mean(joined_results$mathematic_sub_count, na.rm = T), 
+            min = bootsy[1], 
+            max = bootsy[2])
+}
+
+set.seed(100)
+enviro_data <- lapply(seq(10, 200, by = 10), function(x){env_data_test(lake_data = lake_data, subsample_size = x)}) |>
+  rbindlist()
 
 # Equations ----
 
