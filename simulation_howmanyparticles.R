@@ -244,8 +244,6 @@ env_data_test <- function(lake_data, subsample_size) {
     mutate(mathematic_sub_count = finite_corrected_eq(pop_size = sample_size, uncorrected = uncorrected_eq(max_error = max_error, 
                                                                                                            #expected_p = max_prop, 
                                                                                                            groups = 2)))
-
-
  bootsy <- boot_mean(joined_results$mathematic_sub_count) |>
    quantile(probs = c(0.025, 0.975)) 
  
@@ -297,17 +295,20 @@ ggplot() +
 
 simulation_validation <- test_df %>%
   mutate(mathematic_sub_count = finite_corrected_eq(pop_size = sample_count, uncorrected = uncorrected_eq(max_error = median_error))) %>%
-  mutate(mathematic_sub_count_grouped = finite_corrected_eq(pop_size = sample_count, uncorrected = uncorrected_eq(max_error = median_error_multiple, groups = 4)))
+  mutate(mathematic_sub_count_grouped = finite_corrected_eq(pop_size = sample_count, uncorrected = uncorrected_eq(max_error = median_error_multiple, groups = 4))) %>%
+  bind_rows(enviro_data %>% rename(num_particles = subsample_size))
 
 ggplot(simulation_validation) +
-  geom_point(aes(x = num_particles, y = mathematic_sub_count), size = 4, alpha = 0.5) + 
-  geom_point(aes(x = num_particles, y = mathematic_sub_count_grouped), size = 4, alpha = 0.5, color = "red") + 
+  geom_point(aes(x = num_particles, y = mathematic_sub_count), size = 3, alpha = 0.5) + 
+  geom_point(aes(x = num_particles, y = mathematic_sub_count_grouped), size = 3, alpha = 0.5, color = "red") + 
+  geom_point(aes(x = num_particles, y = mean), size = 3, alpha = 0.5, color = "green") + 
+  #geom_errorbar(aes(x = num_particles, y = mean, ymin = min, ymax = max), size = 4, alpha = 0.5, color = "green") + 
   scale_x_log10(limits = c(10,150000)) + 
   scale_y_log10(limits = c(10,150000)) +
   geom_abline(slope=1, intercept = 0) +
-  theme_dark(base_size = 20) +
+  theme_classic(base_size = 20) +
   coord_equal() +
-  labs(x = "Simulated Sample Counts", y = "Calculated Sample Counts")
+  labs(x = "Measured/Simulated Sample Counts", y = "Calculated Sample Counts")
 
 #final recommendations for sample size and subsample size. ----
 uncorrected_eq()
