@@ -26,10 +26,20 @@ finite_corrected_eq <- function(pop_size, uncorrected){
   round(pop_size * uncorrected / (uncorrected + pop_size - 1), 0)
 } 
 
-uncorrected_eq <- function(confidence = 0.95, groups = 1, expected_p = 0.5, max_error = 0.05){
-  critical_val = qnorm(p=(1-confidence^(1/groups))/2) # The group root is a new thing here. 
+#https://onlinelibrary.wiley.com/doi/epdf/10.1002/%28SICI%291097-0258%2819971130%2916%3A22%3C2529%3A%3AAID-SIM692%3E3.0.CO%3B2-J
+#https://bmcmedresmethodol.biomedcentral.com/articles/10.1186/s12874-019-0754-4
+
+uncorrected_eq <- function(confidence = 0.95, groups = 1, correlations = 0.5, expected_p = 0.5, max_error = 0.05){
+  critical_val = qnorm(p=(1-confidence^(1/groups^(1-mean(correlations))))/2) # The group root is a new thing here. 
   round(critical_val^2*expected_p*(1-expected_p)/max_error^2, 0)
 }
+
+
+#test different critical value calc approaches
+critical_val1 = qnorm(p=(1-confidence^(1/groups))/2)
+
+critical_val2 = qnorm(p=(1-confidence)^groups/2)
+
 
 boot_mean_error_class_num <- function(sample_subsample_size, sample_count, classes){
     #Disallow sample count to if(sample_count < sample_classes)
@@ -180,6 +190,13 @@ for(n in 1:nrow(test_df)){
 
 lake_data <- fread("datasets_SubsamplingDatasets/2_MPs_features.csv")
 
+#Correlations
+rcompanion::cramerV(lake_data$shape, lake_data$color, bias.correct = T)
+DescTools::ContCoef(lake_data$shape, lake_data$color, correct = T)
+DescTools::UncertCoef(table(lake_data$shape, lake_data$color), direction = "column")
+DescTools::UncertCoef(table(lake_data$shape, lake_data$color), direction = "row")
+DescTools::UncertCoef(table(lake_data$shape, lake_data$color), direction = "symmetric")
+
 env_data_test <- function(lake_data, subsample_size) {
  
   full_results_shape <- lake_data |>
@@ -241,7 +258,8 @@ env_data_test <- function(lake_data, subsample_size) {
   joined_results <- bind_rows(results_subsampled_shape, results_subsampled_color) |>
     group_by(sample_lake) |>
     filter(max_error == max(max_error)) |>
-    mutate(mathematic_sub_count = finite_corrected_eq(pop_size = sample_size, uncorrected = uncorrected_eq(max_error = max_error, 
+    mutate(mathematic_sub_count = finite_corrected_eq(pop_size = sample_size, uncorrected = uncorrected_eq(max_error = max_error,
+                                                                                                           #correlations = 0.99,
                                                                                                            #expected_p = max_prop, 
                                                                                                            groups = 2)))
  bootsy <- boot_mean(joined_results$mathematic_sub_count) |>
@@ -296,7 +314,9 @@ ggplot() +
 simulation_validation <- test_df %>%
   mutate(mathematic_sub_count = finite_corrected_eq(pop_size = sample_count, uncorrected = uncorrected_eq(max_error = median_error))) %>%
   mutate(mathematic_sub_count_grouped = finite_corrected_eq(pop_size = sample_count, uncorrected = uncorrected_eq(max_error = median_error_multiple, groups = 4))) %>%
-  bind_rows(enviro_data %>% rename(num_particles = subsample_size))
+  bind_rows(enviro_data %>% rename(num_particles = subsample_size)) %>%
+  mutate(ratio = num_particles/mean) #Important to note here, the ratios never exceed one which means that it is always conservative, seems like min ratio is 0.45 so ends up recommending twice the count necessary. 
+
 
 ggplot(simulation_validation) +
   geom_point(aes(x = num_particles, y = mathematic_sub_count), size = 3, alpha = 0.5) + 
